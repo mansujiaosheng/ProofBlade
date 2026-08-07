@@ -16,7 +16,11 @@ import type { ProofBladeConfig } from "../src/config.js";
 import { CodingClaimVerifier, requiresClaimVerification } from "../src/verification/claim-verification.js";
 import { CodingEvidenceGraph } from "../src/knowledge/evidence-graph.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { join, resolve } from "node:path";
+
+const execFileAsync = promisify(execFile);
 
 test("coding provider tools keep one stable Skill and MCP proxy contract", () => {
   const snapshot = codingProviderToolContractSnapshot();
@@ -53,6 +57,13 @@ test("coding claim verification rejects decoys and persists a matching reproduct
   await writeFile(join(dir, "protected.bin"), Buffer.from(candidate, "utf8").map((byte) => byte ^ 0x5a));
   await writeFile(join(dir, "solve.mjs"), "import { readFileSync } from 'node:fs';\nconst data = readFileSync('protected.bin');\nprocess.stdout.write(Buffer.from(data.map((byte) => byte ^ 0x5a)).toString('utf8'));\n", "utf8");
   const env = new NodeExecutionEnv({ cwd: dir });
+  env.exec = async (command, options) => {
+    assert.equal(command, "node solve.mjs");
+    const { stdout, stderr } = await execFileAsync(process.execPath, ["solve.mjs"], { cwd: dir });
+    options?.onStdout?.(stdout);
+    options?.onStderr?.(stderr);
+    return { ok: true, value: { stdout, stderr, exitCode: 0 } };
+  };
   const verifier = new CodingClaimVerifier(runId, services.control, services.artifacts);
   const evidenceGraph = new CodingEvidenceGraph(runId, services.control, services.artifacts);
   const context = {
@@ -106,7 +117,7 @@ test("coding claim verification rejects decoys and persists a matching reproduct
     assert.equal(verifier.project("完成这道题，并得到flag", "最终结果：LCTF2026EV-ARM-GW-042").status, "unverified");
   } finally {
     await env.cleanup();
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 

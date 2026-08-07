@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-07T23:08:26.1335151+08:00",
+  "updatedAt": "2026-08-07T23:55:00+08:00",
   "plans": [
     {
       "id": "PLAN-001",
@@ -351,6 +351,37 @@
         "npm run check:change-contracts",
         "npm run verify"
       ]
+    },
+    {
+      "id": "UPDATE-20260807-008",
+      "occurredAt": "2026-08-07T23:55:00+08:00",
+      "summary": "实现 Intent 调度器和评分系统，支持多维度评分、硬过滤和资源认领。",
+      "branch": "feat/intent-scheduler",
+      "commit": "self",
+      "planIds": [
+        "PLAN-110"
+      ],
+      "changes": [
+        "实现 8 维度 Intent 评分公式（信息增益、成功率、证据相关性、新颖性、成本、风险、重复度、依赖深度）",
+        "实现 6 条硬过滤规则（依赖满足、资源可用、预算检查、证据需求、尝试次数、版本兼容）",
+        "实现 6 个触发条件（新 Fact、Intent 归零、连续失败、预算过半、新 Hint、Verifier 否决）",
+        "集成 scheduler_intent 命令类型实现持久化",
+        "完善资源认领机制，支持多资源事务和失败回滚",
+        "新增 CLI 命令（intents list/score/graph/claim）用于调试和可视化",
+        "修复 LeaseManager API 适配和类型冲突",
+        "补齐 CLI list/score/graph/claim 端到端集成测试并纳入 verify",
+        "移除临时计划文件并统一 CLI 可测试输出边界",
+        "消除 Windows WSL Shell 依赖和临时目录 EBUSY 清理竞态"
+      ],
+      "validation": [
+        "Intent scorer 单元测试通过",
+        "Intent filter 硬过滤规则测试通过",
+        "Intent scheduler 资源认领和回滚测试通过",
+        "CLI 命令功能验证",
+        "npm run test:cli-intents",
+        "Intent replay 回归测试",
+        "npm run verify"
+      ]
     }
   ],
   "completions": [
@@ -437,6 +468,31 @@
         "Full repository verification passed"
       ],
       "nextReviewTrigger": "修改 change-contracts、组件哈希算法、关闭协调器、AbortSignal 边界或 SandboxPort 生命周期"
+    },
+    {
+      "id": "MAINT-20260807-003",
+      "performedAt": "2026-08-07T23:55:00+08:00",
+      "status": "passed",
+      "scope": "Intent Scheduler P1 ???CLI ?????Windows ?????? PR ????",
+      "actions": [
+        "?? CLI ????????? Intent CLI ???????????",
+        "?? Intent ??????? ControlStore ? IntentFilter ??",
+        "???? Node ??????????? Windows ????????????",
+        "? origin/main ?????????????????????"
+      ],
+      "findings": [
+        "????CLI ???????? logFn",
+        "????CLI ??????????????",
+        "????coding claim ??? Windows ?????? WSL ??? EBUSY ????",
+        "???????????? PR ??????"
+      ],
+      "validation": [
+        "130/130 main tests passed",
+        "Intent CLI integration scenarios passed",
+        "Component documentation check passed (25 components, 5 affected)",
+        "npm run verify"
+      ],
+      "nextReviewTrigger": "?? Intent ????CLI ?????ExecutionEnv Shell ??????????"
     }
   ]
 }

@@ -207,7 +207,7 @@ export interface ReasoningForestIndex {
   hash: string;
 }
 
-export interface Intent {
+export interface IntentLegacy {
   id: string;
   title: string;
   description: string;
@@ -359,7 +359,8 @@ export interface RunSnapshot {
   reasoningEdges: Record<string, ReasoningEdge>;
   reasoningTrees: Record<string, ReasoningTree>;
   hypotheses: Record<string, Hypothesis>;
-  intents: Record<string, Intent>;
+  intents: Record<string, IntentLegacy>;
+  schedulerIntents: Record<string, import("./intent.js").Intent>;
   completions: Record<string, CompletionProposal>;
   checkpoints: Record<string, CheckpointRef>;
   jobs: Record<string, JobRecord>;
@@ -389,6 +390,7 @@ export type EventType =
   | "effect_reconciled"
   | "fact_added"
   | "intent_changed"
+  | "scheduler_intent_changed"
   | "hypothesis_added"
   | "evidence_added"
   | "reasoning_node_upserted"

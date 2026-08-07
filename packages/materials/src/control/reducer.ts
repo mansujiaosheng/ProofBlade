@@ -18,6 +18,7 @@ export function createInitialSnapshot(runId: string, task: TaskContract): RunSna
     reasoningTrees: {},
     hypotheses: {},
     intents: {},
+    schedulerIntents: {},
     completions: {},
     checkpoints: {},
     jobs: {},
@@ -149,6 +150,12 @@ export function reduce(snapshot: RunSnapshot, event: HarnessEvent): RunSnapshot 
       const intent = p.intent as RunSnapshot["intents"][string];
       if (!intent?.id) throw new Error("intent_changed requires intent");
       next.intents[intent.id] = intent;
+      break;
+    }
+    case "scheduler_intent_changed": {
+      const intent = p.intent as RunSnapshot["schedulerIntents"][string];
+      if (!intent?.id) throw new Error("scheduler_intent_changed requires intent");
+      next.schedulerIntents[intent.id] = intent;
       break;
     }
     case "artifact_registered": {
