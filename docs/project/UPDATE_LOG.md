@@ -1,12 +1,13 @@
 # 更新日志
 
 > 此文件由 `project-status.json` 生成，请勿直接编辑。
-> 状态更新时间：2026-08-07T23:08:26.1335151+08:00
+> 状态更新时间：2026-08-07T23:55:00+08:00
 
 ## 索引
 
 | 更新 | 时间 | 关联计划 | 分支 | 提交 |
 | --- | --- | --- | --- | --- |
+| UPDATE-20260807-008 | 2026-08-07T23:55:00+08:00 | PLAN-110 | feat/intent-scheduler | 本条记录所在提交 |
 | UPDATE-20260807-007 | 2026-08-07T23:08:26.1335151+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-006 | 2026-08-07T22:44:53.9883278+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
 | UPDATE-20260807-005 | 2026-08-07T22:17:05.6261580+08:00 | PLAN-130 | codex/gui-shutdown-v2 | 本条记录所在提交 |
@@ -14,6 +15,35 @@
 | UPDATE-20260807-003 | 2026-08-07T19:55:00+08:00 | PLAN-001 | codex/ci-regression-gates | 本条记录所在提交 |
 | UPDATE-20260807-002 | 2026-08-07T18:37:33+08:00 | PLAN-002 | codex/component-audit-ledger | 本条记录所在提交 |
 | UPDATE-20260807-001 | 2026-08-07T18:09:45+08:00 | PLAN-001 | codex/component-audit-ledger | a468b14 |
+
+## UPDATE-20260807-008
+
+时间：2026-08-07T23:55:00+08:00
+
+摘要：实现 Intent 调度器和评分系统，支持多维度评分、硬过滤和资源认领。
+
+### 变更
+
+- 实现 8 维度 Intent 评分公式（信息增益、成功率、证据相关性、新颖性、成本、风险、重复度、依赖深度）
+- 实现 6 条硬过滤规则（依赖满足、资源可用、预算检查、证据需求、尝试次数、版本兼容）
+- 实现 6 个触发条件（新 Fact、Intent 归零、连续失败、预算过半、新 Hint、Verifier 否决）
+- 集成 scheduler_intent 命令类型实现持久化
+- 完善资源认领机制，支持多资源事务和失败回滚
+- 新增 CLI 命令（intents list/score/graph/claim）用于调试和可视化
+- 修复 LeaseManager API 适配和类型冲突
+- 补齐 CLI list/score/graph/claim 端到端集成测试并纳入 verify
+- 移除临时计划文件并统一 CLI 可测试输出边界
+- 消除 Windows WSL Shell 依赖和临时目录 EBUSY 清理竞态
+
+### 验证
+
+- [x] Intent scorer 单元测试通过
+- [x] Intent filter 硬过滤规则测试通过
+- [x] Intent scheduler 资源认领和回滚测试通过
+- [x] CLI 命令功能验证
+- [x] npm run test:cli-intents
+- [x] Intent replay 回归测试
+- [x] npm run verify
 
 ## UPDATE-20260807-007
 

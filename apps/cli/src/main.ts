@@ -276,6 +276,25 @@ async function main(): Promise<void> {
       }
       break;
     }
+    case "intents": {
+      const { IntentScheduler, LeaseManager } = await import("@proofblade/materials");
+
+      // 创建 LeaseManager 和 IntentScheduler
+      const leaseManager = new LeaseManager(services.control);
+      const scheduler = new IntentScheduler(
+        services.control,
+        leaseManager,
+        {
+          maxOpenIntents: 8,
+          maxAttemptsPerIntent: 3,
+        }
+      );
+
+      const { handleIntentsCommand } = await import("./commands/intents.js");
+      // 传递 [subCommand, runId, ...rest] = [arg, ...rest]
+      await handleIntentsCommand([arg, ...rest], scheduler, services.control);
+      break;
+    }
     case "help":
     case "--help":
     case "-h":
@@ -369,6 +388,7 @@ function helpText(): string {
     "  fixture-reset <run-id>",
     "  fixture-score <run-id> <candidate>",
     "  agent <run-id> [prompt]  Run a Pi AgentHarness turn through LM Studio",
+    "  intents [list|score|graph|claim] <run-id>  Manage Intent scheduler",
     "  --config <path>           Select a project configuration file",
   ].join("\n");
 }

@@ -1,5 +1,6 @@
 export * from "./config.js";
 export * from "./domain/types.js";
+export * from "./domain/intent.js";
 export * from "./domain/reasoning.js";
 export * from "./control/control-store.js";
 export * from "./control/lease-manager.js";
@@ -19,6 +20,9 @@ export * from "./verification/verifier.js";
 export * from "./verification/claim-verification.js";
 export * from "./orchestration/single-agent-loop.js";
 export * from "./orchestration/planner.js";
+export * from "./orchestration/intent-scheduler.js";
+export * from "./orchestration/intent-scorer.js";
+export * from "./orchestration/intent-filter.js";
 export * from "./domain/handoff.js";
 export * from "./tools/contracts.js";
 export * from "./tools/errors.js";
