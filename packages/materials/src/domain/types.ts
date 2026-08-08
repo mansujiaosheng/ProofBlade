@@ -203,7 +203,9 @@ export interface ReasoningForestIndex {
   generatedSeq: number;
   trees: ReasoningForestTreeSummary[];
   sharedNodes: Array<{ nodeId: string; treeIds: string[] }>;
+  orphanNodeCount: number;
   orphanNodeIds: string[];
+  orphanNodes: Array<{ id: string; name: string; summary: string; kind: ReasoningNodeKind; updatedSeq: number }>;
   hash: string;
 }
 

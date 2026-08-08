@@ -4,15 +4,15 @@
 {
   "id": "materials",
   "name": "Materials 物资层核心",
-  "version": "0.12.11",
+  "version": "0.12.12",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-09T04:00:00.000Z",
+  "updatedAt": "2026-08-09T05:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 7,
-    "securityAuditCount": 7,
-    "lastBugAuditAt": "2026-08-09T04:00:00.000Z",
-    "lastSecurityAuditAt": "2026-08-09T04:00:00.000Z",
-    "sourceHash": "ae98f75ee5d0cc3929f51aa88c06bc06369cd7a1891cdf952bdd0e477b74d539",
+    "bugAuditCount": 8,
+    "securityAuditCount": 8,
+    "lastBugAuditAt": "2026-08-09T05:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-09T05:00:00.000Z",
+    "sourceHash": "7bebbaf9a0430de6b679fce03684c72478eb6a7f94de28a9c4745fa430cc55d3",
     "result": "passed"
   }
 }
@@ -40,9 +40,9 @@
 - 后台 Job 只持久化 Provider 安全参数副本；原始参数仅用于当前进程执行，脱敏参数不能跨进程自动重放。
 - Coding Agent 的 `read`/`bash` 结果保存原始材料并返回稳定 Artifact 锚点；名称、摘要、标签、用途和关联关系进入可重放的语义投影，只有 Evidence/Fact 链上的内容才视为结论依据。
 - 推理知识以共享 DAG 持久化，并按主题投影成可折叠的 Reasoning Tree；多棵树组成 Forest，同一 Artifact/Evidence 节点可以被重复采用但不得复制权威数据。
-- 未审阅的侦察 Artifact 由 Evidence Curation Gate 限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。
+- 未审阅的侦察 Artifact 由 Evidence Curation Gate 按内容哈希去重后限流；软检查点要求整理，硬检查点停止继续 `read/bash`，但不自动把普通输出提升为 Evidence。任一同内容副本完成 `record/annotate` 后，其余副本不再重复占用整理预算。
 - Context 维护采用单调 Tool Result 表示、目标预算裁剪和 idle-time 持久压缩；压缩后的 recent tail 必须受模型级预算约束，`length` 恢复必须有重试上限。
-- Tool 断路器必须覆盖含成功结果的混合批次，并在后续 Provider 请求前停止；恢复原因只能在 Harness 确认终止后进入 Agent 返回值和持久化 Assistant 消息，不能误标正常完成或向 GUI 返回空文本。
+- Tool 断路器必须同时覆盖重复失败和无信息增益的成功观察。无进展判定只统计滚动窗口内内容哈希相同的 `read/bash` 或只读 Evidence 操作；文件、验证或知识图写入会清空窗口，同批写入不得因工具顺序被误停。恢复原因只能在 Harness 确认终止后进入 Agent 返回值和持久化 Assistant 消息，不能误标正常完成或向 GUI 返回空文本。
 - Tool 输出改写由 `tools.outputRewrite` 选择 `builtin | rtk`；RTK 命令、失败策略、超时和原始输出上限都来自配置。
 - 解题型 Coding 对话的最终候选必须经过 `verify_claim` 复现；失败样本要覆盖诱饵字符串、候选不一致和缺少复现三种情况。
 - 确定性 baseline 默认执行六个 Fixture 各三次；子集可用于诊断，但合并门禁必须满足完整覆盖和全部证据、重放及泄漏检查，报告哈希必须包含执行预算和规范化 Fixture Catalog 内容哈希。

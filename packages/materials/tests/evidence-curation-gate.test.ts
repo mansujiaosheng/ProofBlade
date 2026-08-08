@@ -61,6 +61,21 @@ test("evidence curation gate checkpoints exploration and clears reviewed artifac
     const reviewed = await gate.inspect();
     assert.equal(reviewed.pendingCount, 6);
     assert.equal(reviewed.pendingArtifacts.some((item) => item.id === ids[1]), false);
+
+    await artifacts.putText(runId, "observation 1", {
+      filename: "read-duplicate.txt",
+      mime: "text/plain",
+      sensitivity: "public",
+      semantic: {
+        name: "重复读取结果",
+        summary: "与已经审阅的输出内容相同。",
+        tags: ["read", "file-content"],
+        role: "intermediate",
+        relatedIds: [],
+        annotatedBy: "harness",
+      },
+    });
+    assert.equal((await gate.inspect()).pendingCount, 6);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

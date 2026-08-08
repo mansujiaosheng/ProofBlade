@@ -27,8 +27,8 @@ import { codingActiveToolNames, createCodingTools, type CodingResourceContext } 
 import { createConfiguredModels, resolveModelProfile } from "./lmstudio-provider.js";
 import type { AgentLanePort, AgentOutcome } from "./pi-adapter.js";
 import { promptWithContextLengthRecovery } from "./context-length-recovery.js";
-import { attachRepeatedToolFailureBreaker, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
-import { RepeatedToolFailureBreaker } from "./tool-repeat-breaker.js";
+import { attachCodingTurnGuards, finalizeCodingTurn, type CodingTurnTermination } from "./coding-turn-projection.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker } from "./tool-repeat-breaker.js";
 
 const CODING_SYSTEM_PROMPT = `You are ProofBlade (证锋), a coding agent working with the user in their current project workspace.
 
@@ -51,7 +51,9 @@ export class PiCodingLane implements AgentLanePort {
     private readonly claimVerifier: CodingClaimVerifier,
     private readonly maintenance: { compactRequested: boolean },
     private readonly repeatBreaker: RepeatedToolFailureBreaker,
+    private readonly progressBreaker: NoProgressToolBreaker,
     private readonly termination: CodingTurnTermination,
+    private readonly refreshForestContext: () => Promise<void>,
     private readonly latestAssistantEntryId: () => Promise<string | undefined>,
   ) {}
 
@@ -92,7 +94,7 @@ export class PiCodingLane implements AgentLanePort {
     const claimVerifier = new CodingClaimVerifier(options.runId, options.controlStore, artifactStore);
     const evidenceGraph = new CodingEvidenceGraph(options.runId, options.controlStore, artifactStore);
     const evidenceCurationGate = new EvidenceCurationGate(options.runId, options.controlStore);
-    const forestContext = formatReasoningForestContext(await evidenceGraph.inspectForest());
+    const forestContext = { value: formatReasoningForestContext(await evidenceGraph.inspectForest()) };
     const outputRewrite = createOutputRewritePort(resolveOutputRewriteConfig(options.config), options.runDir, createExecutionEnvRtkProcessRunner(env));
     const toolContext: CodingResourceContext = {
       env,
@@ -107,6 +109,7 @@ export class PiCodingLane implements AgentLanePort {
     };
     const stableSystemPrompt = codingSystemPrompt(resources, mcp.summaries().filter((server) => enabledMcpServers.has(server.name) && !server.disabled));
     const repeatBreaker = new RepeatedToolFailureBreaker();
+    const progressBreaker = new NoProgressToolBreaker();
     const termination: CodingTurnTermination = {};
     const harness = new AgentHarness<CodingResourceContext>({
       session,
@@ -120,7 +123,7 @@ export class PiCodingLane implements AgentLanePort {
       systemPrompt: () => stableSystemPrompt,
       streamOptions: { timeoutMs: profile.requestTimeoutMs, maxRetries: profile.maxRetries, maxRetryDelayMs: profile.maxRetryDelayMs, cacheRetention: profile.cacheRetention },
     });
-    attachRepeatedToolFailureBreaker(harness, repeatBreaker, termination);
+    attachCodingTurnGuards(harness, repeatBreaker, progressBreaker, termination);
     const maintenance = { compactRequested: false };
     const activeTools = tools.filter((tool) => activeToolNames.includes(tool.name));
     const fixedContextTokens = estimateTokens(stableSystemPrompt) + estimateTokens(JSON.stringify(activeTools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters }))));
@@ -128,7 +131,7 @@ export class PiCodingLane implements AgentLanePort {
     const contextBudget = Math.max(256, profile.contextWindow - profile.maxTokens - fixedContextTokens - providerSafetyTokens);
     const targetMessageBudget = Math.max(256, Math.floor(contextBudget * 0.5));
     harness.on("context", ({ messages }) => {
-      const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext), availableTokens: contextBudget, messageBudget: targetMessageBudget });
+      const prepared = prepareContextMaintenance({ messages: injectReasoningForestContext(messages, forestContext.value), availableTokens: contextBudget, messageBudget: targetMessageBudget });
       if (prepared.nextAction === "compact") maintenance.compactRequested = true;
       return { messages: prepared.messages };
     });
@@ -154,7 +157,9 @@ export class PiCodingLane implements AgentLanePort {
       claimVerifier,
       maintenance,
       repeatBreaker,
+      progressBreaker,
       termination,
+      async () => { forestContext.value = formatReasoningForestContext(await evidenceGraph.inspectForest()); },
       async () => {
         const branch = await session.getBranch();
         for (let index = branch.length - 1; index >= 0; index -= 1) {
@@ -168,9 +173,12 @@ export class PiCodingLane implements AgentLanePort {
 
   public async prompt(text: string): Promise<AgentOutcome> {
     this.repeatBreaker.reset();
+    this.progressBreaker.reset();
     delete this.termination.message;
+    delete this.termination.reason;
     this.termination.requested = false;
     this.termination.confirmed = false;
+    await this.refreshForestContext();
     this.busy = true;
     const correlationId = `${this.runId}:main:chat-turn`;
     await this.controlStore.append(this.runId, [{

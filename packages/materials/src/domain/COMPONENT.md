@@ -4,15 +4,15 @@
 {
   "id": "materials-domain",
   "name": "Domain Contracts",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "createdAt": "2026-08-05T22:49:12+08:00",
-  "updatedAt": "2026-08-07T17:39:20+08:00",
+  "updatedAt": "2026-08-09T05:00:00.000Z",
   "qualityAudit": {
-    "bugAuditCount": 1,
-    "securityAuditCount": 1,
-    "lastBugAuditAt": "2026-08-07T17:39:20+08:00",
-    "lastSecurityAuditAt": "2026-08-07T17:39:20+08:00",
-    "sourceHash": "ef023e275ba101983205cd7a7e4e233fc507b962e4f0209e2e0aaab1f8121f8e",
+    "bugAuditCount": 2,
+    "securityAuditCount": 2,
+    "lastBugAuditAt": "2026-08-09T05:00:00.000Z",
+    "lastSecurityAuditAt": "2026-08-09T05:00:00.000Z",
+    "sourceHash": "0654b996ee1ffc96df1dcf167957d11fa723fff9a70493a63a56f859ed6c9b49",
     "result": "passed"
   }
 }
@@ -34,6 +34,8 @@
 `JobRecord.argsRedacted` 表示持久化参数不是可执行原文。恢复流程不得把这类参数交给 Provider 重放。
 
 Reasoning Tree 是共享 DAG 的可读投影，不是独立复制的数据结构。引用已有领域实体的节点复用其稳定 ID；只有中间推理节点使用独立 ID。
+
+Reasoning Forest 的 orphan 投影必须同时保留总数和有界的近期语义摘要，避免把无界 ID 列表注入模型上下文。
 
 ```powershell
 npm run typecheck --workspace=@proofblade/materials

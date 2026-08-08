@@ -17,6 +17,7 @@ import {
   requiresClaimVerification,
   type AppServices,
   type AgentLanePort,
+  type AgentOutcome,
   type HarnessEvent,
   type ModelProfileConfig,
   type ProofBladeConfig,
@@ -381,7 +382,7 @@ export class DebugDataService {
         emit({ type: "paused", runId });
         return;
       }
-      const recoverableTermination = outcome.termination === "repeated_tool_failure";
+      const recoverableTermination = isRecoverableTermination(outcome.termination);
       if (!recoverableTermination && (outcome.errorMessage || outcome.stopReason === "error")) {
         emit({ type: "error", error: outcome.errorMessage || "模型请求失败" });
         return;
@@ -545,10 +546,10 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
   const assistantEvents = events.filter((event) => event.type === "assistant_message");
   for (const event of [...assistantEvents].reverse()) {
     const text = typeof event.payload?.text === "string" ? event.payload.text : undefined;
-    if (event.payload?.termination === "repeated_tool_failure" && text) {
+    if (isRecoverableTermination(event.payload?.termination) && text) {
       const piEntryId = typeof event.payload?.piEntryId === "string" ? event.payload.piEntryId : undefined;
       const interrupted = piEntryId
-        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && item.stopReason === "error")
+        ? messages.find((item) => item.role === "assistant" && item.entryId === piEntryId && !item.text && (item.stopReason === "error" || item.stopReason === "toolUse"))
         : undefined;
       if (interrupted) {
         interrupted.text = text;
@@ -576,6 +577,10 @@ export function conversationMessagesFromEntries(entries: readonly SessionEntryLi
     }
   }
   return messages;
+}
+
+function isRecoverableTermination(value: unknown): value is NonNullable<AgentOutcome["termination"]> {
+  return value === "repeated_tool_failure" || value === "no_progress";
 }
 
 export function correlateToolCalls(

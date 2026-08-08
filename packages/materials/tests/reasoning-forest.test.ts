@@ -27,6 +27,8 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
     const branchAArtifact = await services.artifacts.putText(runId, "branch a", { filename: "branch-a.txt", mime: "text/plain", sensitivity: "public" });
     const branchBArtifact = await services.artifacts.putText(runId, "branch b", { filename: "branch-b.txt", mime: "text/plain", sensitivity: "public" });
     const shared = await graph.recordEvidence({ name: "共享观察", summary: "两个推理方向共同采用的离散观察。", artifactIds: [sharedArtifact.id], tags: ["shared"] });
+    const orphanArtifact = await services.artifacts.putText(runId, "orphan source", { filename: "orphan.txt", mime: "text/plain", sensitivity: "public" });
+    const orphan = await graph.recordEvidence({ name: "近期孤立证据", summary: "尚未并入任何推理树，但下一轮仍需看到其语义摘要。", artifactIds: [orphanArtifact.id], tags: ["orphan"] });
     const branchA = await graph.recordEvidence({ name: "方向 A", summary: "共享观察与 A 产物共同支撑主张 A。", artifactIds: [branchAArtifact.id], dependsOn: [shared.evidenceId], claim: "主张 A 成立", tags: ["branch-a"] });
     const branchB = await graph.recordEvidence({ name: "方向 B", summary: "共享观察与 B 产物共同支撑主张 B。", artifactIds: [branchBArtifact.id], dependsOn: [shared.evidenceId], claim: "主张 B 成立", tags: ["branch-b"] });
 
@@ -38,7 +40,11 @@ test("reasoning forest reuses evidence across trees and rejects invalid graph ed
     assert.deepEqual(forest.sharedNodes.find((item) => item.nodeId === sharedArtifact.id)?.treeIds.sort(), [branchA.treeId!, branchB.treeId!].sort());
     assert.ok(forest.trees.find((tree) => tree.id === branchA.treeId)?.relatedTreeIds.includes(branchB.treeId!));
     assert.ok(forest.trees.find((tree) => tree.id === branchB.treeId)?.relatedTreeIds.includes(branchA.treeId!));
+    assert.ok(forest.orphanNodes.some((node) => node.id === orphan.evidenceId && node.name === "近期孤立证据"));
+    assert.equal(forest.orphanNodeCount, forest.orphanNodeIds.length);
     assert.match(formatReasoningForestContext(forest), /reasoning-forest/);
+    assert.match(formatReasoningForestContext(forest), /近期孤立证据/);
+    assert.match(formatReasoningForestContext({ ...forest, trees: [], sharedNodes: [] }), /近期孤立证据/);
     const tree = await graph.inspectTree(branchA.treeId!);
     assert.equal((tree.tree as { rootNodeId: string }).rootNodeId, branchA.factId);
     assert.ok((tree.nodes as Array<{ id: string }>).some((node) => node.id === shared.evidenceId));

@@ -37,10 +37,19 @@ export class EvidenceCurationGate {
       ...(evidence.source.artifactIds ?? []),
       ...(evidence.source.artifactId ? [evidence.source.artifactId] : []),
     ]));
+    const reviewedHashes = new Set(Object.values(snapshot.artifacts)
+      .filter((artifact) => promoted.has(artifact.id) || artifact.semantic?.annotatedBy === "agent")
+      .map((artifact) => artifact.sha256));
+    const pendingHashes = new Set<string>();
     const pending = Object.values(snapshot.artifacts)
       .filter(isInvestigationArtifact)
-      .filter((artifact) => !promoted.has(artifact.id) && artifact.semantic?.annotatedBy !== "agent")
-      .sort((left, right) => (left.semantic?.updatedSeq ?? 0) - (right.semantic?.updatedSeq ?? 0));
+      .filter((artifact) => !reviewedHashes.has(artifact.sha256) && artifact.semantic?.annotatedBy !== "agent")
+      .sort((left, right) => (left.semantic?.updatedSeq ?? 0) - (right.semantic?.updatedSeq ?? 0))
+      .filter((artifact) => {
+        if (pendingHashes.has(artifact.sha256)) return false;
+        pendingHashes.add(artifact.sha256);
+        return true;
+      });
     return {
       stage: pending.length >= this.policy.requiredArtifacts
         ? "required"

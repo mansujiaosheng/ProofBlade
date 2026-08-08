@@ -89,6 +89,21 @@ test("[contract:repeated-tool-failure-conversation] projects a persisted breaker
   assert.equal(messages[0]?.error, undefined);
 });
 
+test("[contract:no-progress-conversation] projects a persisted convergence stop onto its exact tool-use entry", () => {
+  const messages = conversationMessagesFromEntries([{
+    type: "message",
+    id: "assistant-no-progress",
+    timestamp: "2026-08-05T00:00:03.000Z",
+    message: { role: "assistant", content: [{ type: "toolCall", id: "read-3", name: "read", arguments: { path: "firmware.asm" } }], stopReason: "toolUse" },
+  }], [{
+    type: "assistant_message",
+    payload: { text: "Repeated exploration produced no new information.", stopReason: "stop", termination: "no_progress", piEntryId: "assistant-no-progress" },
+  }] as HarnessEvent[]);
+  assert.equal(messages[0]?.text, "Repeated exploration produced no new information.");
+  assert.equal(messages[0]?.stopReason, "stop");
+  assert.equal(messages[0]?.error, undefined);
+});
+
 test("[contract:repeated-tool-failure-entry-link] an old breaker event cannot overwrite a later provider failure", () => {
   const messages = conversationMessagesFromEntries([
     {
@@ -218,6 +233,31 @@ test("[contract:repeated-tool-failure-chat-done] streams a breaker termination a
     const events: ChatStreamEvent[] = [];
     await data.chat(runId, "inspect the workspace", (event) => events.push(event), undefined, undefined, root);
 
+    assert.equal(events.some((event) => event.type === "error"), false);
+    const done = events.find((event): event is Extract<ChatStreamEvent, { type: "done" }> => event.type === "done");
+    assert.equal(done?.text, message);
+    assert.equal(done?.stopReason, "stop");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("[contract:no-progress-chat-done] streams a convergence stop as a normal assistant reply", async () => {
+  const root = await mkdtemp(join(tmpdir(), "proofblade-gui-no-progress-"));
+  const message = "Repeated exploration produced no new information.";
+  const lane: AgentLanePort = {
+    async prompt() { return { text: message, stopReason: "stop", termination: "no_progress", usage: zeroUsage() }; },
+    async abort() {},
+    async compact() {},
+    async isIdle() { return true; },
+    async close() {},
+  };
+  try {
+    const data = new DebugDataService(root, config, join(root, "proofblade.config.json"), async () => lane);
+    const runId = "CHAT-NO-PROGRESS-001";
+    await data.createConversation({ runId, title: "convergence test", workspacePath: root });
+    const events: ChatStreamEvent[] = [];
+    await data.chat(runId, "continue", (event) => events.push(event), undefined, undefined, root);
     assert.equal(events.some((event) => event.type === "error"), false);
     const done = events.find((event): event is Extract<ChatStreamEvent, { type: "done" }> => event.type === "done");
     assert.equal(done?.text, message);

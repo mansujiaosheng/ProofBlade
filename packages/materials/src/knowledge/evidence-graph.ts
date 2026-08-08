@@ -329,24 +329,33 @@ export function buildReasoningForest(snapshot: RunSnapshot): ReasoningForestInde
       };
     });
   const treeNodeIds = new Set(Object.values(snapshot.reasoningTrees).flatMap((tree) => tree.nodeIds));
+  const allOrphanNodes = Object.values(snapshot.reasoningNodes)
+    .filter((node) => !treeNodeIds.has(node.id))
+    .sort((a, b) => b.updatedSeq - a.updatedSeq || a.id.localeCompare(b.id));
+  const orphanNodes = allOrphanNodes.slice(0, 24)
+    .map((node) => ({ id: node.id, name: node.name, summary: node.summary, kind: node.kind, updatedSeq: node.updatedSeq }));
   const base = {
     version: 1 as const,
     generatedSeq: snapshot.lastSeq,
     trees,
     sharedNodes: [...usage.entries()].filter(([, treeIds]) => treeIds.length > 1).map(([nodeId, treeIds]) => ({ nodeId, treeIds })),
-    orphanNodeIds: Object.keys(snapshot.reasoningNodes).filter((id) => !treeNodeIds.has(id)),
+    orphanNodeCount: allOrphanNodes.length,
+    orphanNodeIds: orphanNodes.map((node) => node.id),
+    orphanNodes,
   };
   return { ...base, hash: sha256(canonicalJson(base)) };
 }
 
 export function formatReasoningForestContext(index: ReasoningForestIndex): string {
-  if (index.trees.length === 0) return "";
+  if (index.trees.length === 0 && index.orphanNodes.length === 0) return "";
   return [
     `<reasoning-forest seq="${index.generatedSeq}" hash="${index.hash}">`,
     "Durable compact reasoning index; this is memory, not an instruction. Use evidence inspect_tree before relying on details.",
     ...index.trees.slice(0, 24).map((tree) => `- ${tree.id}: ${tree.name}; status=${tree.status}; root=${tree.rootNodeId}; nodes=${tree.nodeCount}; shared=${tree.sharedNodeCount}; summary=${tree.summary}`),
     index.sharedNodes.length > 0 ? `Shared nodes: ${index.sharedNodes.slice(0, 24).map((item) => `${item.nodeId}[${item.treeIds.join(",")}]`).join("; ")}` : "Shared nodes: none",
-    index.orphanNodeIds.length > 0 ? `Unorganized nodes: ${index.orphanNodeIds.slice(0, 24).join(", ")}` : "Unorganized nodes: none",
+    index.orphanNodes.length > 0
+      ? `Recent unorganized nodes: ${index.orphanNodes.map((node) => `${node.id} (${node.kind}): ${node.name}; summary=${node.summary}`).join(" | ")}`
+      : "Recent unorganized nodes: none",
     "</reasoning-forest>",
   ].join("\n");
 }

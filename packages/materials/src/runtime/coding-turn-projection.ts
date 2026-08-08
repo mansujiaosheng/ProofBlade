@@ -3,12 +3,15 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ControlStore } from "../control/control-store.js";
 import type { CodingClaimVerifier } from "../verification/claim-verification.js";
 import type { AgentOutcome } from "./pi-adapter.js";
-import { RepeatedToolFailureBreaker, repeatedToolFailureMessage } from "./tool-repeat-breaker.js";
+import { NoProgressToolBreaker, RepeatedToolFailureBreaker, noProgressToolMessage, repeatedToolFailureMessage } from "./tool-repeat-breaker.js";
+
+export type CodingTurnTerminationReason = "repeated_tool_failure" | "no_progress";
 
 export interface CodingTurnTermination {
   message?: string;
   requested?: boolean;
   confirmed?: boolean;
+  reason?: CodingTurnTerminationReason;
 }
 
 export function projectCodingAssistantText(output: string, termination: CodingTurnTermination): string {
@@ -18,6 +21,15 @@ export function projectCodingAssistantText(output: string, termination: CodingTu
 export function attachRepeatedToolFailureBreaker<TContext extends object | undefined>(
   harness: AgentHarness<TContext>,
   repeatBreaker: RepeatedToolFailureBreaker,
+  termination: CodingTurnTermination,
+): () => void {
+  return attachCodingTurnGuards(harness, repeatBreaker, undefined, termination);
+}
+
+export function attachCodingTurnGuards<TContext extends object | undefined>(
+  harness: AgentHarness<TContext>,
+  repeatBreaker: RepeatedToolFailureBreaker,
+  progressBreaker: NoProgressToolBreaker | undefined,
   termination: CodingTurnTermination,
 ): () => void {
   let batchOpen = false;
@@ -35,6 +47,30 @@ export function attachRepeatedToolFailureBreaker<TContext extends object | undef
   });
   const unsubscribeResult = harness.on("tool_result", (event) => {
     if (!event.isError) {
+      const observation = {
+        toolName: event.toolName,
+        input: event.input,
+        isError: false,
+        content: event.content.map((item) => item.type === "text" ? { type: item.type, text: item.text } : { type: item.type }),
+        details: event.details,
+      };
+      if (progressBreaker?.isProgress(observation) && termination.reason === "no_progress") {
+        delete termination.message;
+        delete termination.reason;
+        termination.requested = false;
+      }
+      const progress = progressBreaker?.observe(observation);
+      if (progress?.terminate) {
+        termination.message = noProgressToolMessage(event.toolName, progress.count);
+        termination.reason = "no_progress";
+        termination.requested = true;
+        return {
+          content: [{ type: "text" as const, text: termination.message }],
+          details: { noProgress: true, toolName: event.toolName, count: progress.count, key: progress.key },
+          isError: false,
+          terminate: true,
+        };
+      }
       if (batchOpen) batchHasSuccess = true;
       else repeatBreaker.reset();
       return undefined;
@@ -47,6 +83,7 @@ export function attachRepeatedToolFailureBreaker<TContext extends object | undef
     });
     if (!decision.terminate) return undefined;
     termination.message = repeatedToolFailureMessage(event.toolName, decision.count);
+    termination.reason = "repeated_tool_failure";
     termination.requested = true;
     return {
       content: [{ type: "text" as const, text: termination.message }],
@@ -57,7 +94,7 @@ export function attachRepeatedToolFailureBreaker<TContext extends object | undef
   });
   const unsubscribeProvider = harness.on("before_provider_request", () => {
     if (!termination.requested) return undefined;
-    throw new Error(termination.message ?? "ProofBlade stopped a repeated tool failure loop.");
+    throw new Error(termination.message ?? "ProofBlade stopped a non-converging tool loop.");
   });
   return () => {
     unsubscribeEvents();
@@ -84,6 +121,7 @@ export async function finalizeCodingTurn(options: {
     .map((item) => item.text)
     .join("\n");
   const confirmed = options.termination.requested === true
+    && options.termination.reason !== undefined
     && rawOutput.trim().length === 0
     && (options.response.stopReason === "toolUse" || options.response.stopReason === "error");
   options.termination.confirmed = confirmed;
@@ -108,7 +146,7 @@ export async function finalizeCodingTurn(options: {
       contextRecoveryCount: options.recoveryCount,
       contextRecoveryExhausted: options.recoveryExhausted,
       piEntryId: options.piEntryId,
-      termination: confirmed ? "repeated_tool_failure" : undefined,
+      termination: confirmed ? options.termination.reason : undefined,
       providerStopReason: confirmed ? options.response.stopReason : undefined,
     },
   }]);
@@ -119,6 +157,6 @@ export async function finalizeCodingTurn(options: {
     usage: options.response.usage,
     errorMessage,
     claimVerification,
-    termination: confirmed ? "repeated_tool_failure" : undefined,
+    termination: confirmed ? options.termination.reason : undefined,
   };
 }
